@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trakt Wrapped</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111;
+            color: #fff;
+            overflow: hidden; /* Prevent scrolling during slides */
+        }
+        
+        .heading-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Slide Transitions */
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            transform: scale(0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+            transform: scale(1);
+            z-index: 10;
+        }
+
+        /* Background Animation */
+        .bg-gradient-animate {
+            background: linear-gradient(-45deg, #ed1c24, #2a2a2a, #1a1a1a, #000000);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Floating Shapes */
+        .floating-shape {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.1;
+            animation: float 20s infinite linear;
+            z-index: 1;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100vh) rotate(360deg); }
+        }
+
+        /* Confetti */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #ed1c24;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(720deg); }
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            z-index: 50;
+            display: flex;
+        }
+
+        .progress-segment {
+            flex: 1;
+            background: rgba(255,255,255,0.2);
+            margin-right: 2px;
+            height: 100%;
+            transition: background 0.3s ease;
+        }
+
+        /* Updated Active State to Red */
+        .progress-segment.active {
+            background: #ed1c24;
+            box-shadow: 0 0 8px rgba(237, 28, 36, 0.6);
+        }
+
+        .trakt-red {
+            color: #ed1c24;
+        }
+        
+        .bg-trakt-red {
+            background-color: #ed1c24;
+        }
+
+        /* Pattern for fallback backgrounds */
+        .pattern-dots {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="bg-gradient-animate h-screen w-screen overflow-hidden text-white">
+
+    <!-- Floating Background Shapes -->
+    <div id="shapes-container" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="app" class="relative w-full h-full z-10 flex flex-col">
+        
+        <!-- LOGIN SCREEN -->
+        <div id="login-screen" class="slide active bg-black/80 backdrop-blur-sm z-50 overflow-y-auto custom-scroll">
+            <div class="max-w-md w-full bg-neutral-900 p-8 rounded-2xl border border-neutral-800 shadow-2xl my-auto">
+                <div class="flex justify-center mb-6">
+                    <i data-lucide="play-circle" class="w-16 h-16 text-[#ed1c24]"></i>
+                </div>
+                <h1 class="text-3xl font-bold mb-2 heading-font text-center">Trakt Wrapped</h1>
+                <p class="text-gray-400 text-center mb-6">Discover your streaming year in review.</p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Trakt Username</label>
+                        <input type="text" id="username" placeholder="e.g. justin" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg p-3 focus:outline-none focus:border-[#ed1c24] transition-colors" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">
+                            Trakt Client ID 
+                            <span class="text-xs text-[#ed1c24] ml-1">*Required</span>
+                        </label>
+                        <input type="text" id="client-id" placeholder="Your Trakt API Client ID" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg p-3 focus:outline-none focus:border-[#ed1c24] transition-colors" />
+                        <p class="text-xs text-gray-500 mt-1">
+                            <a href="https://trakt.tv/oauth/applications" target="_blank" class="text-gray-400 hover:text-[#ed1c24] underline">Get Trakt ID here</a> (Redirect URI can be anything).
+                        </p>
+                    </div>
+
+                    <div class="pt-2 pb-2 border-t border-neutral-800 mt-2">
+                        <label class="block text-sm font-medium text-gray-400 mb-1">
+                            TMDB API Key 
+                            <span class="text-xs text-gray-500 ml-1">(Optional, for Posters)</span>
+                        </label>
+                        <input type="text" id="tmdb-key" placeholder="Your TMDB API Key (v3)" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg p-3 focus:outline-none focus:border-[#ed1c24] transition-colors" />
+                        <p class="text-xs text-gray-500 mt-1">
+                            Trakt doesn't provide images. Add a free <a href="https://www.themoviedb.org/settings/api" target="_blank" class="text-gray-400 hover:text-[#ed1c24] underline">TMDB Key</a> to see posters.
+                        </p>
+                    </div>
+                    
+                    <button onclick="startWrapped()" class="w-full bg-[#ed1c24] hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-transform active:scale-95 flex items-center justify-center gap-2 mt-2">
+                        <span id="btn-text">Get My Stats</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+
+                    <div class="relative py-2">
+                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-neutral-700"></div></div>
+                        <div class="relative flex justify-center text-sm"><span class="px-2 bg-neutral-900 text-gray-500">Or</span></div>
+                    </div>
+
+                    <button onclick="startDemo()" class="w-full bg-neutral-700 hover:bg-neutral-600 text-white font-medium py-3 rounded-lg transition-transform active:scale-95">
+                        Try Demo Mode (with Mock Posters)
+                    </button>
+                </div>
+                
+                <div id="error-msg" class="hidden mt-4 p-3 bg-red-900/50 border border-red-800 rounded text-red-200 text-sm text-center"></div>
+            </div>
+        </div>
+
+        <!-- LOADING SCREEN -->
+        <div id="loading-screen" class="slide bg-black z-40 hidden">
+            <div class="flex flex-col items-center">
+                <i data-lucide="loader-2" class="w-12 h-12 text-[#ed1c24] animate-spin mb-4"></i>
+                <h2 class="text-xl font-bold animate-pulse">Crunching the numbers...</h2>
+                <p class="text-gray-500 text-sm mt-2" id="loading-status">Fetching history...</p>
+            </div>
+        </div>
+
+        <!-- CONTENT SLIDES -->
+        <div id="slides-container" class="hidden w-full h-full relative">
+            
+            <!-- Progress Bar -->
+            <div class="progress-container" id="progress-bar">
+                <!-- Segments injected via JS -->
+            </div>
+
+            <!-- Slide 1: Intro -->
+            <div class="slide" id="slide-1">
+                <i data-lucide="calendar-days" class="w-24 h-24 text-[#ed1c24] mb-6 animate-bounce"></i>
+                <h2 class="text-4xl md:text-6xl font-black heading-font mb-4">Your <span class="trakt-red" id="year-display">2024</span></h2>
+                <p class="text-xl md:text-2xl text-gray-300">It's been quite a year for streaming.</p>
+                <div class="mt-8 px-6 py-2 bg-white/10 rounded-full border border-white/20 backdrop-blur-md">
+                    <p class="text-sm font-mono">Let's see what you watched.</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: Totals -->
+            <div class="slide" id="slide-2">
+                <div class="text-center w-full max-w-4xl">
+                    <h3 class="text-2xl font-bold mb-8 text-gray-300">The Grand Totals</h3>
+                    
+                    <div class="grid grid-cols-2 gap-4 md:gap-8 mb-8">
+                        <div class="bg-white/5 p-6 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                            <i data-lucide="film" class="w-8 h-8 text-blue-400 mx-auto mb-2"></i>
+                            <p class="text-4xl md:text-6xl font-black heading-font" id="stat-movies">0</p>
+                            <p class="text-sm text-gray-400 uppercase tracking-wider">Movies</p>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                            <i data-lucide="tv" class="w-8 h-8 text-green-400 mx-auto mb-2"></i>
+                            <p class="text-4xl md:text-6xl font-black heading-font" id="stat-episodes">0</p>
+                            <p class="text-sm text-gray-400 uppercase tracking-wider">Episodes</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-[#ed1c24]/20 p-8 rounded-2xl border border-[#ed1c24]/30 backdrop-blur-sm max-w-xl mx-auto">
+                        <p class="text-lg text-gray-200 mb-1">Total Time Watched (Est.)</p>
+                        <p class="text-5xl md:text-7xl font-black heading-font text-white" id="stat-hours">0</p>
+                        <p class="text-sm text-gray-300">Hours</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: Top Movies Podium (Rated Logic) -->
+            <div class="slide" id="slide-3">
+                <div class="relative w-full max-w-5xl mx-auto p-2 h-full flex flex-col justify-center">
+                    <div class="absolute top-10 left-0 w-full text-center z-0">
+                         <h3 class="text-3xl md:text-4xl font-bold mb-2" id="movies-slide-title">Top Movies</h3>
+                         <p class="text-gray-400 text-sm" id="movies-slide-subtitle">Your favorites</p>
+                    </div>
+                    
+                    <div class="flex items-end justify-center w-full h-[60vh] mt-16 gap-2 md:gap-4 px-2">
+                        
+                        <!-- Rank 2 (Left) -->
+                        <div id="movie-rank-2" class="w-1/3 md:w-1/4 flex flex-col items-center justify-end relative order-1 hidden opacity-0 transition-opacity duration-700 delay-300">
+                            <div class="relative w-full aspect-[2/3] bg-neutral-800 rounded-lg overflow-hidden shadow-lg border border-neutral-700 mb-2 group">
+                                <div class="absolute inset-0 flex items-center justify-center z-0"><i data-lucide="clapperboard" class="w-8 h-8 text-white/10"></i></div>
+                                <img id="movie-img-2" class="absolute inset-0 w-full h-full object-cover z-10 hidden" />
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-20"></div>
+                                <div class="absolute bottom-0 w-full p-2 z-30 text-center">
+                                    <div class="text-gray-400 text-xs font-bold mb-1">#2</div>
+                                    <h4 id="movie-title-2" class="text-xs md:text-sm font-bold truncate text-white leading-tight">---</h4>
+                                    <p class="text-[10px] md:text-xs text-blue-400"><span id="movie-metric-2">0</span></p>
+                                </div>
+                            </div>
+                            <div class="w-full h-16 md:h-24 bg-neutral-800/50 rounded-t-lg border-t border-neutral-700 mx-2"></div>
+                        </div>
+
+                        <!-- Rank 1 (Center) -->
+                        <div id="movie-rank-1" class="w-1/3 md:w-1/3 flex flex-col items-center justify-end relative order-2 z-10 -mb-2">
+                            <i data-lucide="crown" class="w-8 h-8 md:w-12 md:h-12 text-yellow-400 mb-4 animate-bounce drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]"></i>
+                            <div class="relative w-full aspect-[2/3] bg-neutral-800 rounded-xl overflow-hidden shadow-[0_0_30px_rgba(237,28,36,0.2)] border-2 border-[#ed1c24] mb-2 group transform transition-transform hover:scale-105">
+                                <div class="absolute inset-0 flex items-center justify-center z-0"><i data-lucide="clapperboard" class="w-12 h-12 text-white/10"></i></div>
+                                <img id="movie-img-1" class="absolute inset-0 w-full h-full object-cover z-10 hidden" />
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-20"></div>
+                                <div class="absolute bottom-0 w-full p-3 z-30 text-center">
+                                    <div class="text-[#ed1c24] text-sm font-black mb-1">#1</div>
+                                    <h4 id="movie-title-1" class="text-sm md:text-xl font-black heading-font truncate text-white leading-tight">---</h4>
+                                    <p class="text-xs md:text-sm text-blue-400 font-bold mt-1"><span id="movie-metric-1">0</span></p>
+                                </div>
+                            </div>
+                            <div class="w-full h-32 md:h-48 bg-neutral-800 rounded-t-lg border-t-2 border-[#ed1c24] mx-2 shadow-[0_-4px_20px_rgba(237,28,36,0.2)] flex items-center justify-center">
+                                <span class="text-6xl font-black text-white/5 select-none">1</span>
+                            </div>
+                        </div>
+
+                        <!-- Rank 3 (Right) -->
+                        <div id="movie-rank-3" class="w-1/3 md:w-1/4 flex flex-col items-center justify-end relative order-3 hidden opacity-0 transition-opacity duration-700 delay-500">
+                             <div class="relative w-full aspect-[2/3] bg-neutral-800 rounded-lg overflow-hidden shadow-lg border border-neutral-700 mb-2 group">
+                                <div class="absolute inset-0 flex items-center justify-center z-0"><i data-lucide="clapperboard" class="w-8 h-8 text-white/10"></i></div>
+                                <img id="movie-img-3" class="absolute inset-0 w-full h-full object-cover z-10 hidden" />
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-20"></div>
+                                <div class="absolute bottom-0 w-full p-2 z-30 text-center">
+                                    <div class="text-gray-400 text-xs font-bold mb-1">#3</div>
+                                    <h4 id="movie-title-3" class="text-xs md:text-sm font-bold truncate text-white leading-tight">---</h4>
+                                    <p class="text-[10px] md:text-xs text-blue-400"><span id="movie-metric-3">0</span></p>
+                                </div>
+                            </div>
+                            <div class="w-full h-8 md:h-12 bg-neutral-800/30 rounded-t-lg border-t border-neutral-700 mx-2"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: Top Shows Podium -->
+            <div class="slide" id="slide-4">
+                 <div class="relative w-full max-w-5xl mx-auto p-2 h-full flex flex-col justify-center">
+                    <div class="absolute top-10 left-0 w-full text-center z-0">
+                         <h3 class="text-3xl md:text-4xl font-bold mb-2">Top Obsessions</h3>
+                         <p class="text-gray-400 text-sm">The shows you couldn't turn off</p>
+                    </div>
+                    
+                    <div class="flex items-end justify-center w-full h-[60vh] mt-16 gap-2 md:gap-4 px-2">
+                        
+                        <!-- Rank 2 -->
+                        <div id="show-rank-2" class="w-1/3 md:w-1/4 flex flex-col items-center justify-end relative order-1 hidden opacity-0 transition-opacity duration-700 delay-300">
+                            <div class="relative w-full aspect-[2/3] bg-neutral-800 rounded-lg overflow-hidden shadow-lg border border-neutral-700 mb-2">
+                                <div class="absolute inset-0 flex items-center justify-center z-0"><i data-lucide="tv-2" class="w-8 h-8 text-white/10"></i></div>
+                                <img id="show-img-2" class="absolute inset-0 w-full h-full object-cover z-10 hidden" />
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-20"></div>
+                                <div class="absolute bottom-0 w-full p-2 z-30 text-center">
+                                    <div class="text-gray-400 text-xs font-bold mb-1">#2</div>
+                                    <h4 id="show-title-2" class="text-xs md:text-sm font-bold truncate text-white leading-tight">---</h4>
+                                    <p class="text-[10px] md:text-xs text-green-400"><span id="show-count-2">0</span> eps</p>
+                                </div>
+                            </div>
+                            <div class="w-full h-16 md:h-24 bg-neutral-800/50 rounded-t-lg border-t border-neutral-700 mx-2"></div>
+                        </div>
+
+                        <!-- Rank 1 -->
+                        <div id="show-rank-1" class="w-1/3 md:w-1/3 flex flex-col items-center justify-end relative order-2 z-10 -mb-2">
+                            <i data-lucide="crown" class="w-8 h-8 md:w-12 md:h-12 text-yellow-400 mb-4 animate-bounce drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]"></i>
+                            <div class="relative w-full aspect-[2/3] bg-neutral-800 rounded-xl overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.2)] border-2 border-green-500 mb-2 transform transition-transform hover:scale-105">
+                                <div class="absolute inset-0 flex items-center justify-center z-0"><i data-lucide="tv-2" class="w-12 h-12 text-white/10"></i></div>
+                                <img id="show-img-1" class="absolute inset-0 w-full h-full object-cover z-10 hidden" />
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-20"></div>
+                                <div class="absolute bottom-0 w-full p-3 z-30 text-center">
+                                    <div class="text-green-500 text-sm font-black mb-1">#1</div>
+                                    <h4 id="show-title-1" class="text-sm md:text-xl font-black heading-font truncate text-white leading-tight">---</h4>
+                                    <p class="text-xs md:text-sm text-green-400 font-bold mt-1"><span id="show-count-1">0</span> episodes</p>
+                                </div>
+                            </div>
+                            <div class="w-full h-32 md:h-48 bg-neutral-800 rounded-t-lg border-t-2 border-green-500 mx-2 shadow-[0_-4px_20px_rgba(34,197,94,0.2)] flex items-center justify-center">
+                                <span class="text-6xl font-black text-white/5 select-none">1</span>
+                            </div>
+                        </div>
+
+                        <!-- Rank 3 -->
+                        <div id="show-rank-3" class="w-1/3 md:w-1/4 flex flex-col items-center justify-end relative order-3 hidden opacity-0 transition-opacity duration-700 delay-500">
+                             <div class="relative w-full aspect-[2/3] bg-neutral-800 rounded-lg overflow-hidden shadow-lg border border-neutral-700 mb-2">
+                                <div class="absolute inset-0 flex items-center justify-center z-0"><i data-lucide="tv-2" class="w-8 h-8 text-white/10"></i></div>
+                                <img id="show-img-3" class="absolute inset-0 w-full h-full object-cover z-10 hidden" />
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-20"></div>
+                                <div class="absolute bottom-0 w-full p-2 z-30 text-center">
+                                    <div class="text-gray-400 text-xs font-bold mb-1">#3</div>
+                                    <h4 id="show-title-3" class="text-xs md:text-sm font-bold truncate text-white leading-tight">---</h4>
+                                    <p class="text-[10px] md:text-xs text-green-400"><span id="show-count-3">0</span> eps</p>
+                                </div>
+                            </div>
+                            <div class="w-full h-8 md:h-12 bg-neutral-800/30 rounded-t-lg border-t border-neutral-700 mx-2"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: Binge Day -->
+            <div class="slide" id="slide-5">
+                <h3 class="text-2xl font-bold mb-4">Your Binge Day</h3>
+                <p class="text-gray-400 mb-8 max-w-md">Your biggest marathon was on...</p>
+                
+                <div class="relative">
+                    <!-- Calendar visual -->
+                    <div class="grid grid-cols-7 gap-2 mb-8 opacity-50 scale-75 md:scale-100">
+                         <!-- Just visual boxes -->
+                        <div class="w-8 h-8 rounded bg-white/10"></div>
+                        <div class="w-8 h-8 rounded bg-white/10"></div>
+                        <div class="w-8 h-8 rounded bg-white/10"></div>
+                        <div class="w-8 h-8 rounded bg-white/10"></div>
+                        <div class="w-8 h-8 rounded bg-white/10"></div>
+                        <div class="w-8 h-8 rounded bg-white/10"></div>
+                        <div class="w-8 h-8 rounded bg-white/10"></div>
+                    </div>
+
+                    <h2 class="text-3xl md:text-6xl font-black heading-font text-[#ed1c24] mb-2 animate-pulse" id="binge-day">---</h2>
+                    <p class="text-xl text-white" id="binge-day-count">0 items watched</p>
+                </div>
+            </div>
+
+            <!-- Slide 6: Summary -->
+            <div class="slide" id="slide-6">
+                <div id="share-card" class="bg-neutral-900 p-8 rounded-3xl border border-neutral-800 shadow-2xl max-w-sm w-full mx-auto relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-2 bg-[#ed1c24]"></div>
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold heading-font">Trakt Wrapped</h2>
+                        <span class="text-xs font-mono bg-white/10 px-2 py-1 rounded" id="summary-year">2024</span>
+                    </div>
+
+                    <div class="space-y-4 text-left">
+                        <div class="flex justify-between items-end border-b border-white/10 pb-2">
+                            <span class="text-gray-400 text-sm">Total Time</span>
+                            <span class="text-xl font-bold text-white"><span id="summary-hours">0</span>h</span>
+                        </div>
+                        <div class="flex justify-between items-end border-b border-white/10 pb-2">
+                            <span class="text-gray-400 text-sm">Episodes</span>
+                            <span class="text-xl font-bold text-white" id="summary-episodes">0</span>
+                        </div>
+                        <div class="flex justify-between items-end border-b border-white/10 pb-2">
+                            <span class="text-gray-400 text-sm">Movies</span>
+                            <span class="text-xl font-bold text-white" id="summary-movies">0</span>
+                        </div>
+                        <div class="pt-2">
+                            <span class="text-gray-400 text-xs block mb-1">Top Show</span>
+                            <span class="text-lg font-bold text-green-400 truncate block" id="summary-top-show">---</span>
+                        </div>
+                        <div>
+                             <span class="text-gray-400 text-xs block mb-1">Top Movie</span>
+                            <span class="text-lg font-bold text-blue-400 truncate block" id="summary-top-movie">---</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 flex justify-center">
+                        <div class="flex items-center gap-2 text-xs text-gray-500">
+                             <i data-lucide="check-circle-2" class="w-4 h-4 text-[#ed1c24]"></i>
+                             <span>Verified Trakt Fan</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex flex-col md:flex-row gap-4 w-full max-w-sm mx-auto">
+                    <button onclick="shareStats()" class="flex-1 bg-white text-black font-bold py-3 rounded-full hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="share-2" class="w-4 h-4"></i> Share
+                    </button>
+                    <button onclick="restartApp()" class="flex-1 bg-white/10 text-white font-medium py-3 rounded-full hover:bg-white/20 transition-colors">
+                        Start Over
+                    </button>
+                </div>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div class="absolute bottom-6 left-0 w-full flex justify-between px-8 z-50">
+                <button onclick="prevSlide()" class="p-2 rounded-full bg-black/20 hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                    <i data-lucide="chevron-left" class="w-8 h-8"></i>
+                </button>
+                <button onclick="nextSlide()" class="p-2 rounded-full bg-black/20 hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                    <i data-lucide="chevron-right" class="w-8 h-8"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG ---
+        const CURRENT_YEAR = new Date().getFullYear();
+        let currentSlide = 0;
+        const totalSlides = 6;
+        let watchData = null;
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // --- BACKGROUND ANIMATION ---
+        function createShapes() {
+            const container = document.getElementById('shapes-container');
+            const colors = ['#ed1c24', '#ffffff', '#333333'];
+            for(let i=0; i<15; i++) {
+                const shape = document.createElement('div');
+                shape.classList.add('floating-shape');
+                const size = Math.random() * 100 + 20;
+                shape.style.width = `${size}px`;
+                shape.style.height = `${size}px`;
+                shape.style.left = `${Math.random() * 100}%`;
+                shape.style.top = `${Math.random() * 100}%`;
+                shape.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                shape.style.animationDuration = `${Math.random() * 20 + 10}s`;
+                shape.style.animationDelay = `-${Math.random() * 20}s`;
+                container.appendChild(shape);
+            }
+        }
+        createShapes();
+
+        // --- APP LOGIC ---
+
+        function updateYearDisplay() {
+            document.getElementById('year-display').textContent = CURRENT_YEAR;
+            document.getElementById('summary-year').textContent = CURRENT_YEAR;
+            // document.getElementById('top-movie-year').textContent = CURRENT_YEAR; // Deprecated by podium
+        }
+        updateYearDisplay();
+
+        function showError(msg) {
+            const el = document.getElementById('error-msg');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        async function startWrapped() {
+            const username = document.getElementById('username').value.trim();
+            const clientId = document.getElementById('client-id').value.trim();
+            const tmdbKey = document.getElementById('tmdb-key').value.trim();
+
+            if (!username || !clientId) {
+                showError("Please enter both Username and Trakt Client ID.");
+                return;
+            }
+
+            document.getElementById('login-screen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('loading-screen').classList.remove('hidden');
+                document.getElementById('loading-screen').style.opacity = '1';
+                fetchTraktData(username, clientId, tmdbKey);
+            }, 500);
+        }
+
+        function startDemo() {
+            document.getElementById('login-screen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('loading-screen').classList.remove('hidden');
+                document.getElementById('loading-screen').style.opacity = '1';
+                
+                // Simulate loading
+                setTimeout(() => {
+                    processData(generateMockData(), null); // Null key for demo
+                }, 1500);
+            }, 500);
+        }
+
+        function generateMockData() {
+            // Create some fake interesting data with Mock Images for Demo
+            const movies = [];
+            const episodes = [];
+            const ratings = []; // Mock ratings
+            const shows = ['Breaking Bad', 'The Office', 'Stranger Things', 'Succession', 'The Bear'];
+            const movieTitles = ['Oppenheimer', 'Barbie', 'Dune: Part Two', 'The Batman', 'Inception'];
+            
+            // Generate 45 movies
+            for(let i=0; i<45; i++) {
+                const mTitle = movieTitles[Math.floor(Math.random() * movieTitles.length)];
+                movies.push({
+                    watched_at: randomDateInYear(),
+                    movie: {
+                        title: mTitle,
+                        year: 2023,
+                        ids: { tmdb: 123 } // Mock ID
+                    }
+                });
+                
+                // Add mock rating for some
+                if(i < 10) {
+                    ratings.push({
+                        rated_at: randomDateInYear(),
+                        rating: 10 - (i % 3), // 10, 9, 8
+                        type: "movie",
+                        movie: { title: mTitle, year: 2023, ids: { tmdb: 123 } }
+                    });
+                }
+            }
+
+            // Generate 200 episodes
+            for(let i=0; i<200; i++) {
+                const show = shows[Math.floor(Math.random() * shows.length)];
+                episodes.push({
+                    watched_at: randomDateInYear(),
+                    show: { title: show, ids: { tmdb: 456 } },
+                    episode: { season: 1, number: i % 10 + 1 }
+                });
+            }
+
+            // Mock Poster Overrides for Demo
+            return { 
+                movies, 
+                episodes, 
+                ratings,
+                isDemo: true,
+                demoPosters: {
+                    movie: "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg", // Oppenheimer
+                    show: "https://image.tmdb.org/t/p/w500/z0XiwdrCQ9yVIr4O0pxzaAYRxdW.jpg"   // Succession
+                }
+            };
+        }
+
+        function randomDateInYear() {
+            const start = new Date(CURRENT_YEAR, 0, 1);
+            const end = new Date();
+            return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())).toISOString();
+        }
+
+        async function fetchTraktData(username, clientId, tmdbKey) {
+            const startYear = `${CURRENT_YEAR}-01-01T00:00:00.000Z`;
+            const endYear = new Date().toISOString(); // Now
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'trakt-api-version': '2',
+                'trakt-api-key': clientId
+            };
+
+            try {
+                // Fetch Movies
+                document.getElementById('loading-status').textContent = "Fetching movies...";
+                // Limit to 500 items to prevent overload
+                const movieRes = await fetch(`https://api.trakt.tv/users/${username}/history/movies?start_at=${startYear}&end_at=${endYear}&limit=500`, { headers });
+                
+                if (!movieRes.ok) throw new Error("Could not fetch movies. Check username/ID or privacy settings.");
+                const movies = await movieRes.json();
+
+                // Fetch Episodes
+                document.getElementById('loading-status').textContent = "Fetching episodes...";
+                const epRes = await fetch(`https://api.trakt.tv/users/${username}/history/episodes?start_at=${startYear}&end_at=${endYear}&limit=500`, { headers });
+                
+                if (!epRes.ok) throw new Error("Could not fetch episodes.");
+                const episodes = await epRes.json();
+
+                // Fetch Ratings (Movies)
+                document.getElementById('loading-status').textContent = "Checking ratings...";
+                let ratings = [];
+                try {
+                    const ratingsRes = await fetch(`https://api.trakt.tv/users/${username}/ratings/movies?limit=100`, { headers });
+                    if(ratingsRes.ok) {
+                        ratings = await ratingsRes.json();
+                    }
+                } catch(e) { console.log("Ratings fetch failed, skipping"); }
+
+                if (movies.length === 0 && episodes.length === 0) {
+                     throw new Error("No history found for this year!");
+                }
+
+                processData({ movies, episodes, ratings }, tmdbKey);
+
+            } catch (err) {
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('login-screen').style.opacity = '1';
+                showError(err.message);
+            }
+        }
+
+        async function processData(data, tmdbKey) {
+            watchData = {
+                moviesCount: data.movies.length,
+                episodesCount: data.episodes.length,
+                totalMovies: data.movies,
+                totalEpisodes: data.episodes
+            };
+
+            // 1. Calculate Time (Est: Movie=120m, Ep=45m)
+            const movieMinutes = watchData.moviesCount * 120;
+            const episodeMinutes = watchData.episodesCount * 45;
+            watchData.totalHours = Math.round((movieMinutes + episodeMinutes) / 60);
+
+            // 2. Top Rated Movies (Logic Update)
+            let topMoviesList = [];
+            let useRatings = false;
+
+            // Filter ratings for current year
+            const yearRatings = data.ratings ? data.ratings.filter(r => r.rated_at.startsWith(CURRENT_YEAR.toString())) : [];
+
+            if (yearRatings.length > 0) {
+                useRatings = true;
+                // Sort by Rating (Desc)
+                topMoviesList = yearRatings.sort((a,b) => b.rating - a.rating).slice(0,3).map(r => ({
+                    title: r.movie.title,
+                    metric: `Rated ${r.rating}/10`,
+                    year: r.movie.year,
+                    ids: r.movie.ids,
+                    poster: null
+                }));
+            } else {
+                // Fallback to Most Watched if no ratings
+                const movieMap = {};
+                data.movies.forEach(m => {
+                    const title = m.movie.title;
+                    if(!movieMap[title]) movieMap[title] = { count: 0, year: m.movie.year, ids: m.movie.ids };
+                    movieMap[title].count++;
+                });
+                const sortedMovies = Object.entries(movieMap).sort((a,b) => b[1].count - a[1].count);
+                topMoviesList = sortedMovies.slice(0, 3).map(entry => ({
+                    title: entry[0],
+                    metric: `${entry[1].count} plays`,
+                    year: entry[1].year,
+                    ids: entry[1].ids,
+                    poster: null
+                }));
+            }
+            
+            watchData.topMovies = topMoviesList;
+            watchData.moviesMetricType = useRatings ? "rated" : "watched";
+
+            // 3. Top Shows (Calculate Top 3)
+            const showMap = {};
+            const showIdMap = {}; 
+
+            data.episodes.forEach(e => {
+                const title = e.show.title;
+                if(!showMap[title]) {
+                    showMap[title] = 0;
+                    showIdMap[title] = e.show.ids;
+                }
+                showMap[title]++;
+            });
+            
+            const sortedShows = Object.entries(showMap).sort((a,b) => b[1] - a[1]);
+            // Slice top 3
+            watchData.topShows = sortedShows.slice(0, 3).map(entry => ({
+                title: entry[0],
+                count: entry[1],
+                ids: showIdMap[entry[0]],
+                poster: null
+            }));
+
+            // 4. Binge Day (Exact Date)
+            const dateMap = {};
+            
+            [...data.movies, ...data.episodes].forEach(item => {
+                const d = new Date(item.watched_at);
+                // Use date string as key to group by specific day
+                const dateKey = d.toDateString(); 
+                if(!dateMap[dateKey]) dateMap[dateKey] = 0;
+                dateMap[dateKey]++;
+            });
+            
+            const sortedDates = Object.entries(dateMap).sort((a,b) => b[1] - a[1]);
+            
+            if (sortedDates.length > 0) {
+                const bestDate = new Date(sortedDates[0][0]);
+                // Format: "Mon, Oct 24, 2024"
+                const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+                watchData.bingeDay = bestDate.toLocaleDateString('en-US', options);
+                watchData.bingeDayCount = sortedDates[0][1];
+            } else {
+                watchData.bingeDay = "N/A";
+                watchData.bingeDayCount = 0;
+            }
+
+            // --- FETCH POSTERS IF KEY PRESENT ---
+            document.getElementById('loading-status').textContent = "Finding posters...";
+            
+            if (data.isDemo) {
+                 // Demo: Just reuse same poster or cycle mock ones if you had them
+                 watchData.topMovies.forEach((m, i) => m.poster = data.demoPosters.movie);
+                 watchData.topShows.forEach((s, i) => s.poster = data.demoPosters.show);
+            } else if (tmdbKey) {
+                try {
+                    // Fetch all movie posters concurrently
+                    const moviePromises = watchData.topMovies.map(m => fetchPoster(m.ids?.tmdb, 'movie', tmdbKey));
+                    const moviePosters = await Promise.all(moviePromises);
+                    watchData.topMovies.forEach((m, i) => m.poster = moviePosters[i]);
+
+                    // Fetch all show posters concurrently
+                    const showPromises = watchData.topShows.map(s => fetchPoster(s.ids?.tmdb, 'tv', tmdbKey));
+                    const showPosters = await Promise.all(showPromises);
+                    watchData.topShows.forEach((s, i) => s.poster = showPosters[i]);
+
+                } catch (e) {
+                    console.error("Poster fetch failed", e);
+                }
+            }
+
+            // Populate UI
+            populateSlides();
+            
+            // Transition to Slide 1
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('slides-container').classList.remove('hidden');
+            initSlides();
+        }
+
+        // Helper for single poster fetch
+        async function fetchPoster(tmdbId, type, apiKey) {
+            if (!tmdbId) return null;
+            try {
+                const res = await fetch(`https://api.themoviedb.org/3/${type}/${tmdbId}?api_key=${apiKey}`);
+                const data = await res.json();
+                if(data.poster_path) return `https://image.tmdb.org/t/p/w500${data.poster_path}`;
+            } catch(e) { console.log(e); }
+            return null;
+        }
+
+        function populateSlides() {
+            // Slide 2: Totals
+            document.getElementById('stat-movies').textContent = watchData.moviesCount;
+            document.getElementById('stat-episodes').textContent = watchData.episodesCount;
+            document.getElementById('stat-hours').textContent = watchData.totalHours;
+
+            // Slide 3: Top Movies Podium
+            
+            // Update Headers based on data type
+            if(watchData.moviesMetricType === "rated") {
+                document.getElementById('movies-slide-title').textContent = "Top Rated Movies";
+                document.getElementById('movies-slide-subtitle').textContent = "The masterpieces you loved this year";
+            } else {
+                document.getElementById('movies-slide-title').textContent = "Top Movies";
+                document.getElementById('movies-slide-subtitle').textContent = "Your box office hits (Most Watched)";
+            }
+
+            watchData.topMovies.forEach((movie, index) => {
+                const rank = index + 1;
+                const container = document.getElementById(`movie-rank-${rank}`);
+                
+                if (container) {
+                    container.classList.remove('hidden'); // Show container
+                    // Trigger fade-in after a slight delay to allow display:block to take effect
+                    setTimeout(() => container.classList.remove('opacity-0'), 100); 
+
+                    document.getElementById(`movie-title-${rank}`).textContent = movie.title;
+                    document.getElementById(`movie-metric-${rank}`).textContent = movie.metric;
+
+                    const imgEl = document.getElementById(`movie-img-${rank}`);
+                    if (movie.poster) {
+                        imgEl.src = movie.poster;
+                        imgEl.classList.remove('hidden');
+                    } else {
+                        imgEl.classList.add('hidden');
+                    }
+                }
+            });
+
+            // Slide 4: Top Shows Podium
+            watchData.topShows.forEach((show, index) => {
+                const rank = index + 1;
+                const container = document.getElementById(`show-rank-${rank}`);
+                
+                if (container) {
+                    container.classList.remove('hidden');
+                    setTimeout(() => container.classList.remove('opacity-0'), 100);
+
+                    document.getElementById(`show-title-${rank}`).textContent = show.title;
+                    document.getElementById(`show-count-${rank}`).textContent = `${show.count} eps`; 
+
+                    const imgEl = document.getElementById(`show-img-${rank}`);
+                    if (show.poster) {
+                        imgEl.src = show.poster;
+                        imgEl.classList.remove('hidden');
+                    } else {
+                        imgEl.classList.add('hidden');
+                    }
+                }
+            });
+
+            // Slide 5: Binge Day
+            document.getElementById('binge-day').textContent = watchData.bingeDay;
+            document.getElementById('binge-day-count').textContent = `${watchData.bingeDayCount} items watched`;
+
+            // Slide 6: Summary
+            document.getElementById('summary-hours').textContent = watchData.totalHours;
+            document.getElementById('summary-episodes').textContent = watchData.episodesCount;
+            document.getElementById('summary-movies').textContent = watchData.moviesCount;
+            document.getElementById('summary-top-show').textContent = watchData.topShows[0]?.title || "N/A";
+            document.getElementById('summary-top-movie').textContent = watchData.topMovies[0]?.title || "N/A";
+        }
+
+        // --- SLIDESHOW CONTROLS ---
+
+        function initSlides() {
+            // Setup Progress Bar
+            const bar = document.getElementById('progress-bar');
+            bar.innerHTML = '';
+            for(let i=0; i<totalSlides; i++) {
+                const seg = document.createElement('div');
+                seg.classList.add('progress-segment');
+                if(i === 0) seg.classList.add('active');
+                bar.appendChild(seg);
+            }
+            
+            showSlide(0);
+        }
+
+        function showSlide(index) {
+            // Bounds check
+            if(index < 0) index = 0;
+            if(index >= totalSlides) index = totalSlides - 1;
+
+            // Hide all
+            document.querySelectorAll('.slide').forEach(s => {
+                s.classList.remove('active');
+            });
+            
+            // Show new
+            const newSlide = document.getElementById(`slide-${index + 1}`);
+            if(newSlide) newSlide.classList.add('active');
+
+            // Update Progress
+            const segs = document.querySelectorAll('.progress-segment');
+            segs.forEach((seg, i) => {
+                if (i <= index) seg.classList.add('active');
+                else seg.classList.remove('active');
+            });
+
+            currentSlide = index;
+
+            // Trigger Confetti on last slide
+            if(index === totalSlides - 1) {
+                spawnConfetti();
+            }
+        }
+
+        function nextSlide() {
+            showSlide(currentSlide + 1);
+        }
+
+        function prevSlide() {
+            showSlide(currentSlide - 1);
+        }
+
+        function restartApp() {
+            location.reload();
+        }
+
+        function shareStats() {
+            const topMovie = watchData.topMovies[0]?.title || "N/A";
+            const topShow = watchData.topShows[0]?.title || "N/A";
+
+            const text = `🎬 My ${CURRENT_YEAR} on Trakt:\n` +
+                         `⏱️ ${watchData.totalHours} Hours Watched\n` +
+                         `📺 ${topShow} was my obsession\n` +
+                         `🍿 ${topMovie} was my top movie\n` +
+                         `#TraktWrapped`;
+            
+            // Create a temporary textarea to copy to clipboard (works better in iframes than navigator.clipboard sometimes)
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                const btn = document.querySelector('button[onclick="shareStats()"]');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Copied!`;
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    lucide.createIcons();
+                }, 2000);
+            } catch (err) {
+                alert("Could not copy to clipboard :(");
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function spawnConfetti() {
+            const colors = ['#ed1c24', '#fff', '#444'];
+            for(let i=0; i<50; i++) {
+                const c = document.createElement('div');
+                c.classList.add('confetti');
+                c.style.left = Math.random() * 100 + '%';
+                c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                c.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                c.style.top = '-10px';
+                document.body.appendChild(c);
+                
+                // Cleanup
+                setTimeout(() => c.remove(), 4000);
+            }
+        }
+
+        // Keyboard Navigation
+        document.addEventListener('keydown', (e) => {
+            if(document.getElementById('slides-container').classList.contains('hidden')) return;
+            
+            if(e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if(e.key === 'ArrowLeft') prevSlide();
+        });
+
+    </script>
+</body>
+</html>
